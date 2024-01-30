@@ -456,10 +456,10 @@ func (p *CloudFlareProvider) newCloudFlareChange(action string, endpoint *endpoi
 			// Check if the tag only contains letters, numbers, hyphens and underscores
 			if validChar.MatchString(tag) {
 				// Cloudflare tags maximum length is 32 characters
-				if len(tag) > 32 {
-					log.Infof("Tag %s is longer than 32 characters, discarding.", tag)
+				if len(tag) <= 32 {
+					out = append(out, tag)
 				}
-				out = append(out, tag)
+				log.Infof("Tag %s is longer than 32 characters, discarding.", tag)
 			}
 		}
 		sort.Strings(out)

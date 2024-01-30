@@ -122,7 +122,7 @@ func NewIngressSource(ctx context.Context, kubeClient kubernetes.Interface, name
 		ignoreIngressTLSSpec:     ignoreIngressTLSSpec,
 		ignoreIngressRulesSpec:   ignoreIngressRulesSpec,
 		labelSelector:            labelSelector,
-                labels:                   make(map[string]string),
+		labels:                   make(map[string]string),
 	}
 	return sc, nil
 }
@@ -147,9 +147,10 @@ func (sc *ingressSource) Endpoints(ctx context.Context) ([]*endpoint.Endpoint, e
 	endpoints := []*endpoint.Endpoint{}
 
 	for _, ing := range ingresses {
-                // append the labels from the Ingress to the labels field
+		// append the labels from the Ingress to the labels field
 		for key, value := range ing.Labels {
 			sc.labels[key] = value
+			log.Infof("Adding the label %s with value %s", key, value)
 		}
 		// Check controller annotation to see if we are responsible.
 		controller, ok := ing.Annotations[controllerAnnotationKey]
@@ -182,7 +183,9 @@ func (sc *ingressSource) Endpoints(ctx context.Context) ([]*endpoint.Endpoint, e
 	}
 
 	for _, ep := range endpoints {
+		ep.Tags = sc.labels
 		sort.Sort(ep.Targets)
+		log.Infof("Endpoint %s has %d labels", ep.DNSName, len(ep.Tags))
 	}
 
 	return endpoints, nil
