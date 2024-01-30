@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -125,6 +127,7 @@ type CloudFlareProvider struct {
 	proxiedByDefault  bool
 	DryRun            bool
 	DNSRecordsPerPage int
+	labelsAsTags      bool
 }
 
 // cloudFlareChange differentiates between ChangActions
@@ -146,6 +149,7 @@ func getUpdateDNSRecordParam(cfc cloudFlareChange) cloudflare.UpdateDNSRecordPar
 		Proxied: cfc.ResourceRecord.Proxied,
 		Type:    cfc.ResourceRecord.Type,
 		Content: cfc.ResourceRecord.Content,
+		Tags:    cfc.ResourceRecord.Tags,
 	}
 }
 
@@ -157,11 +161,12 @@ func getCreateDNSRecordParam(cfc cloudFlareChange) cloudflare.CreateDNSRecordPar
 		Proxied: cfc.ResourceRecord.Proxied,
 		Type:    cfc.ResourceRecord.Type,
 		Content: cfc.ResourceRecord.Content,
+		Tags:    cfc.ResourceRecord.Tags,
 	}
 }
 
 // NewCloudFlareProvider initializes a new CloudFlare DNS based Provider.
-func NewCloudFlareProvider(domainFilter endpoint.DomainFilter, zoneIDFilter provider.ZoneIDFilter, proxiedByDefault bool, dryRun bool, dnsRecordsPerPage int) (*CloudFlareProvider, error) {
+func NewCloudFlareProvider(domainFilter endpoint.DomainFilter, zoneIDFilter provider.ZoneIDFilter, proxiedByDefault bool, dryRun bool, dnsRecordsPerPage int, labelsAsTags bool) (*CloudFlareProvider, error) {
 	// initialize via chosen auth method and returns new API object
 	var (
 		config *cloudflare.API
@@ -191,6 +196,7 @@ func NewCloudFlareProvider(domainFilter endpoint.DomainFilter, zoneIDFilter prov
 		proxiedByDefault:  proxiedByDefault,
 		DryRun:            dryRun,
 		DNSRecordsPerPage: dnsRecordsPerPage,
+		labelsAsTags:      labelsAsTags,
 	}
 	return provider, nil
 }
@@ -327,6 +333,7 @@ func (p *CloudFlareProvider) submitChanges(ctx context.Context, changes []*cloud
 				"ttl":    change.ResourceRecord.TTL,
 				"action": change.Action,
 				"zone":   zoneID,
+				"tags":   change.ResourceRecord.Tags,
 			}
 
 			log.WithFields(logFields).Info("Changing record.")
@@ -436,6 +443,29 @@ func (p *CloudFlareProvider) newCloudFlareChange(action string, endpoint *endpoi
 		ttl = int(endpoint.RecordTTL)
 	}
 
+	labelsToTags := func(labels map[string]string) []string {
+		// return an empty slice if the feature is disabled
+		if p.labelsAsTags == false {
+			return []string{}
+		}
+
+		out := make([]string, 0, len(labels))
+		var validChar = regexp.MustCompile(`^[a-zA-Z0-9-_]+$`)
+		for k, v := range labels {
+			tag := fmt.Sprintf("%s=%s", k, v)
+			// Check if the tag only contains letters, numbers, hyphens and underscores
+			if validChar.MatchString(tag) {
+				// Cloudflare tags maximum length is 32 characters
+				if len(tag) > 32 {
+					log.Infof("Tag %s is longer than 32 characters, discarding.", tag)
+				}
+				out = append(out, tag)
+			}
+		}
+		sort.Strings(out)
+		return out
+	}
+
 	return &cloudFlareChange{
 		Action: action,
 		ResourceRecord: cloudflare.DNSRecord{
@@ -444,6 +474,7 @@ func (p *CloudFlareProvider) newCloudFlareChange(action string, endpoint *endpoi
 			Proxied: &proxied,
 			Type:    endpoint.RecordType,
 			Content: target,
+			Tags:    labelsToTags(endpoint.Tags),
 		},
 	}
 }

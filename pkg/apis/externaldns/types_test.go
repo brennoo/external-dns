@@ -78,6 +78,7 @@ var (
 		BluecatSkipTLSVerify:        false,
 		CloudflareProxied:           false,
 		CloudflareDNSRecordsPerPage: 100,
+		CloudflareLabelsAsTags:      false,
 		CoreDNSPrefix:               "/skydns/",
 		AkamaiServiceConsumerDomain: "",
 		AkamaiClientToken:           "",

@@ -681,7 +681,8 @@ func TestCloudflareProvider(t *testing.T) {
 		provider.NewZoneIDFilter([]string{""}),
 		false,
 		true,
-		5000)
+		5000,
+		true)
 	if err != nil {
 		t.Errorf("should not fail, %s", err)
 	}
@@ -697,7 +698,8 @@ func TestCloudflareProvider(t *testing.T) {
 		provider.NewZoneIDFilter([]string{""}),
 		false,
 		true,
-		5000)
+		5000,
+		true)
 	if err != nil {
 		t.Errorf("should not fail, %s", err)
 	}
@@ -710,7 +712,8 @@ func TestCloudflareProvider(t *testing.T) {
 		provider.NewZoneIDFilter([]string{""}),
 		false,
 		true,
-		5000)
+		5000,
+		true)
 	if err != nil {
 		t.Errorf("should not fail, %s", err)
 	}
@@ -722,7 +725,8 @@ func TestCloudflareProvider(t *testing.T) {
 		provider.NewZoneIDFilter([]string{""}),
 		false,
 		true,
-		5000)
+		5000,
+		true)
 	if err == nil {
 		t.Errorf("expected to fail")
 	}

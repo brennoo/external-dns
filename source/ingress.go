@@ -65,6 +65,7 @@ type ingressSource struct {
 	ignoreIngressTLSSpec     bool
 	ignoreIngressRulesSpec   bool
 	labelSelector            labels.Selector
+	labels                   map[string]string
 }
 
 // NewIngressSource creates a new ingressSource with the given config.
@@ -121,6 +122,7 @@ func NewIngressSource(ctx context.Context, kubeClient kubernetes.Interface, name
 		ignoreIngressTLSSpec:     ignoreIngressTLSSpec,
 		ignoreIngressRulesSpec:   ignoreIngressRulesSpec,
 		labelSelector:            labelSelector,
+                labels:                   make(map[string]string),
 	}
 	return sc, nil
 }
@@ -145,6 +147,10 @@ func (sc *ingressSource) Endpoints(ctx context.Context) ([]*endpoint.Endpoint, e
 	endpoints := []*endpoint.Endpoint{}
 
 	for _, ing := range ingresses {
+                // append the labels from the Ingress to the labels field
+		for key, value := range ing.Labels {
+			sc.labels[key] = value
+		}
 		// Check controller annotation to see if we are responsible.
 		controller, ok := ing.Annotations[controllerAnnotationKey]
 		if ok && controller != controllerAnnotationValue {

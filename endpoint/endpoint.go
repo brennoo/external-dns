@@ -187,6 +187,9 @@ type Endpoint struct {
 	// ProviderSpecific stores provider specific config
 	// +optional
 	ProviderSpecific ProviderSpecific `json:"providerSpecific,omitempty"`
+	// Tags to contain k8s source objects labels
+	// +optional
+	Tags Tags `json:"tags,omitempty"`
 }
 
 // NewEndpoint initialization method to be used to create an endpoint
@@ -214,6 +217,7 @@ func NewEndpointWithTTL(dnsName, recordType string, ttl TTL, targets ...string) 
 		RecordType: recordType,
 		Labels:     NewLabels(),
 		RecordTTL:  ttl,
+                Tags:       NewTags(),
 	}
 }
 
