@@ -147,6 +147,7 @@ func getUpdateDNSRecordParam(cfc cloudFlareChange) cloudflare.UpdateDNSRecordPar
 		Proxied: cfc.ResourceRecord.Proxied,
 		Type:    cfc.ResourceRecord.Type,
 		Content: cfc.ResourceRecord.Content,
+		Tags:    cfc.ResourceRecord.Tags,
 	}
 }
 
@@ -158,6 +159,7 @@ func getCreateDNSRecordParam(cfc cloudFlareChange) cloudflare.CreateDNSRecordPar
 		Proxied: cfc.ResourceRecord.Proxied,
 		Type:    cfc.ResourceRecord.Type,
 		Content: cfc.ResourceRecord.Content,
+		Tags:    cfc.ResourceRecord.Tags,
 	}
 }
 
@@ -400,6 +402,12 @@ func (p *CloudFlareProvider) AdjustEndpoints(endpoints []*endpoint.Endpoint) ([]
 		}
 		e.SetProviderSpecificProperty(source.CloudflareProxiedKey, strconv.FormatBool(proxied))
 
+		// Set Cloudflare tags annotation
+		tags, exists := e.GetProviderSpecificProperty(source.CloudflareTagsKey)
+		if exists && tags != "" {
+			e.SetProviderSpecificProperty(source.CloudflareTagsKey, tags)
+		}
+
 		adjustedEndpoints = append(adjustedEndpoints, e)
 	}
 	return adjustedEndpoints, nil
@@ -444,6 +452,11 @@ func (p *CloudFlareProvider) newCloudFlareChange(action string, endpoint *endpoi
 		ttl = int(endpoint.RecordTTL)
 	}
 
+	tagsValue, _ := endpoint.GetProviderSpecificProperty(source.CloudflareTagsKey)
+	tags := parseTags(tagsValue)
+
+	log.Infof("Parsed tags: %v", tags) // brennoo: debug
+
 	return &cloudFlareChange{
 		Action: action,
 		ResourceRecord: cloudflare.DNSRecord{
@@ -452,6 +465,7 @@ func (p *CloudFlareProvider) newCloudFlareChange(action string, endpoint *endpoi
 			Proxied: &proxied,
 			Type:    endpoint.RecordType,
 			Content: target,
+			Tags:    tags,
 		},
 	}
 }
@@ -546,4 +560,17 @@ func groupByNameAndType(records []cloudflare.DNSRecord) []*endpoint.Endpoint {
 // Needed because some parameters require a pointer.
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// parseTags parses the Cloudflare tags annotation and returns a slice of tags
+func parseTags(tagsAnnotation string) []string {
+	if tagsAnnotation == "" {
+		return nil
+	}
+
+	tags := strings.Split(tagsAnnotation, ",")
+	for i := range tags {
+		tags[i] = strings.TrimSpace(tags[i])
+	}
+	return tags
 }

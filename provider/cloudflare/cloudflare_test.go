@@ -118,6 +118,7 @@ func getDNSRecordFromRecordParams(rp any) cloudflare.DNSRecord {
 			Proxied: params.Proxied,
 			Type:    params.Type,
 			Content: params.Content,
+			Tags:    params.Tags,
 		}
 	case cloudflare.UpdateDNSRecordParams:
 		return cloudflare.DNSRecord{
@@ -126,6 +127,7 @@ func getDNSRecordFromRecordParams(rp any) cloudflare.DNSRecord {
 			Proxied: params.Proxied,
 			Type:    params.Type,
 			Content: params.Content,
+			Tags:    params.Tags,
 		}
 	default:
 		return cloudflare.DNSRecord{}
@@ -1361,4 +1363,90 @@ func TestCustomTTLWithEnabledProxyNotChanged(t *testing.T) {
 	assert.Equal(t, 0, len(planned.Changes.UpdateNew), "no new changes should be here")
 	assert.Equal(t, 0, len(planned.Changes.UpdateOld), "no new changes should be here")
 	assert.Equal(t, 0, len(planned.Changes.Delete), "no new changes should be here")
+}
+
+func TestCloudflareCreateWithTags(t *testing.T) {
+	endpoints := []*endpoint.Endpoint{
+		{
+			RecordType: "A",
+			DNSName:    "tagged.bar.com",
+			Targets:    endpoint.Targets{"127.0.0.1"},
+			ProviderSpecific: endpoint.ProviderSpecific{
+				endpoint.ProviderSpecificProperty{
+					Name:  "external-dns.alpha.kubernetes.io/cloudflare-tags",
+					Value: "env:prd, team:foundation",
+				},
+			},
+		},
+	}
+
+	AssertActions(t, &CloudFlareProvider{}, endpoints, []MockAction{
+		{
+			Name:   "Create",
+			ZoneId: "001",
+			RecordData: cloudflare.DNSRecord{
+				Type:    "A",
+				Name:    "tagged.bar.com",
+				Content: "127.0.0.1",
+				TTL:     1,
+				Proxied: proxyDisabled,
+				Tags:    []string{"env:prd", "team:foundation"},
+			},
+		},
+	},
+		[]string{endpoint.RecordTypeA, endpoint.RecordTypeCNAME},
+	)
+}
+
+func TestCloudflareUpdateWithTags(t *testing.T) {
+	client := NewMockCloudFlareClientWithRecords(map[string][]cloudflare.DNSRecord{
+		"001": {
+			{
+				ID:      "1234567890",
+				ZoneID:  "001",
+				Name:    "tagged.bar.com",
+				Type:    endpoint.RecordTypeA,
+				TTL:     120,
+				Content: "127.0.0.1",
+				Proxied: proxyDisabled,
+				Tags:    []string{"env:prd"},
+			},
+		},
+	})
+
+	provider := &CloudFlareProvider{
+		Client: client,
+	}
+	endpoints := []*endpoint.Endpoint{
+		{
+			RecordType: "A",
+			DNSName:    "tagged.bar.com",
+			Targets:    endpoint.Targets{"127.0.0.1"},
+			RecordTTL:  120, // Ensure TTL is set here
+			ProviderSpecific: endpoint.ProviderSpecific{
+				endpoint.ProviderSpecificProperty{
+					Name:  "external-dns.alpha.kubernetes.io/cloudflare-tags",
+					Value: "env:prd, team:foundation",
+				},
+			},
+		},
+	}
+
+	AssertActions(t, provider, endpoints, []MockAction{
+		{
+			Name:     "Update",
+			ZoneId:   "001",
+			RecordId: "1234567890",
+			RecordData: cloudflare.DNSRecord{
+				Type:    "A",
+				Name:    "tagged.bar.com",
+				Content: "127.0.0.1",
+				TTL:     120,
+				Proxied: proxyDisabled,
+				Tags:    []string{"env:prd", "team:foundation"},
+			},
+		},
+	},
+		[]string{endpoint.RecordTypeA, endpoint.RecordTypeCNAME},
+	)
 }
